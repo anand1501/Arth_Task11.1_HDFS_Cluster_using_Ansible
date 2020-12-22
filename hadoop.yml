@@ -1,0 +1,101 @@
+- hosts: all
+  vars:
+  - path: "/root/Desktop"
+  - hdpath: "/etc/hadoop"  
+
+  tasks:
+  - copy:
+      src: "{{ path }}/jdk-8u171-linux-x64.rpm"
+      dest: "{{ path }}/"
+  - command: "rpm -ivh {{ path }}/jdk-8u171-linux-x64.rpm --force" 
+  - copy:
+      src: "{{ path }}/hadoop-1.2.1-1.x86_64.rpm"
+      dest: "{{ path }}/"
+  - command: "rpm -ivh {{ path }}/hadoop-1.2.1-1.x86_64.rpm --force" 
+
+- hosts: namenode
+  vars:
+  - hdpath: "/etc/hadoop"
+
+  tasks:
+  - name: "creating the folder in master node"
+    file:
+      path: "/nn"
+      state: directory
+
+  - template: 
+      dest: "{{ hdpath }}/hdfs-site.xml"  
+      src: "/root/ansible_ws/hadoop/namenode/hdfs-site.xml.j2"
+
+  - template:
+      dest: "{{ hdpath }}/core-site.xml"
+      src: "/root/ansible_ws/hadoop/namenode/core-site.xml.j2"
+
+  - name: "format namenode"
+    shell: "echo Y | hadoop namenode -format"    
+    ignore_errors: yes
+
+  - name: "start namenode service"  
+    shell: "hadoop-daemon.sh start namenode"
+    ignore_errors: yes
+
+  - name: "hadoop service status"
+    command: "jps"
+    register: status
+
+
+  - name: "disable firewall"        
+    service: 
+      name: "firewalld"
+      state: stopped
+      enabled: false
+    
+
+- hosts: datanode
+  vars:
+  - hdpath: "/etc/hadoop"
+
+  tasks:
+  - name: "creating the folder in datanode"
+    file:
+      path: "/dn1"
+      state: directory
+
+  - template:
+      dest: "{{ hdpath }}/hdfs-site.xml"
+      src: "/root/ansible_ws/hadoop/datanode/hdfs-site.xml.j2"
+
+  - template:
+      dest: "{{ hdpath }}/core-site.xml"
+      src: "/root/ansible_ws/hadoop/datanode/core-site.xml.j2"
+
+
+  - name: "start datanode service"
+    shell: "hadoop-daemon.sh start datanode"
+    ignore_errors: yes
+
+  - name: "hadoop service status"
+    command: "jps"
+    register: status
+    
+
+  - debug:
+          msg: "{{ status['stdout_lines'] }}"
+
+  - name: "disable firewall"
+    service:
+      name: "firewalld"
+      state: stopped
+      enabled: false
+
+
+- hosts: client
+  vars:
+  - hdpath: "/etc/hadoop"
+
+  tasks:
+  - template:
+      dest: "{{ hdpath }}/core-site.xml"
+      src: "/root/ansible_ws/hadoop/datanode/core-site.xml.j2"
+
+      
